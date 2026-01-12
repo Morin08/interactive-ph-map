@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🇵🇭 Interactive PH Cities Map</title>
+    <style>
+        :root {
+            --primary: #00D4FF;
+            --secondary: #0099CC;
+            --accent: #FFE66D;
+            --dark-bg: #1e3c72;
+            --glass: rgba(255, 255, 255, 0.1);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body { 
+            font-family: 'Segoe UI', Arial, sans-serif; 
+            background: radial-gradient(circle at top right, #2a5298 0%, #1e3c72 100%);
+            color: white; 
+            min-height: 100vh; 
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .container { 
+            width: 100%;
+            max-width: 450px; 
+            background: rgba(0, 0, 0, 0.2);
+            backdrop-filter: blur(10px);
+            border-radius: 30px;
+            padding: 20px;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        h1 { 
+            font-size: 1.8em; 
+            text-shadow: 0 2px 10px rgba(0,0,0,0.3); 
+            margin-bottom: 5px;
+        }
+
+        p.subtitle {
+            font-size: 0.9em;
+            opacity: 0.7;
+        }
+
+        /* MAP CONTAINER */
+        #map-container { 
+            width: 100%; 
+            height: 400px; 
+            background: linear-gradient(180deg, #1A2980 0%, #26D0CE 100%);
+            border-radius: 20px;
+            position: relative; 
+            overflow: hidden; 
+            box-shadow: inset 0 0 20px rgba(0,0,0,0.3);
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        /* SVG Styles */
+        svg {
+            height: 90%;
+            width: auto;
+            filter: drop-shadow(0 5px 5px rgba(0,0,0,0.3));
+            transition: transform 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        .island-path {
+            fill: #4CAF50;
+            stroke: rgba(255,255,255,0.4);
+            stroke-width: 1;
+            transition: fill 0.3s;
+            cursor: pointer;
+        }
+        .island-path:hover { fill: #66BB6A; }
+
+        /* City Markers inside SVG */
+        .city-marker {
+            cursor: pointer;
+            transition: all 0.3s ease;
+            transform-box: fill-box;
+            transform-origin: center;
+        }
+        
+        .city-marker circle {
+            fill: #FF5252;
+            stroke: white;
+            stroke-width: 2;
+        }
+
+        .city-marker text {
+            fill: white;
+            font-size: 12px;
+            font-weight: bold;
+            text-anchor: middle;
+            text-shadow: 0 1px 3px black;
+            opacity: 0; /* Hidden by default */
+            transition: opacity 0.3s;
+        }
+
+        /* Active States */
+        .city-marker:hover text, .city-marker.active text { opacity: 1; }
+        .city-marker:hover circle { fill: #FFD700; r: 8; }
+        .city-marker.active circle { 
+            fill: #FFD700; 
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0% { stroke-width: 2; stroke-opacity: 1; }
+            100% { stroke-width: 10; stroke-opacity: 0; }
+        }
+
+        /* BUTTONS */
+        .buttons { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 15px; }
+        
+        button { 
+            padding: 12px; 
+            background: var(--glass);
+            color: white; 
+            border: 1px solid rgba(255,255,255,0.2);
+            border-radius: 15px; 
+            font-size: 14px; 
+            font-weight: bold;
+            cursor: pointer; 
+            transition: all 0.2s;
+        }
+        button:hover { background: rgba(255,255,255,0.2); transform: translateY(-2px); }
+        button.active-btn { background: var(--primary); border-color: var(--primary); color: #00334e; }
+        
+        .reset-btn {
+            grid-column: span 3;
+            background: rgba(255, 82, 82, 0.2);
+            color: #ff8a80;
+        }
+        .reset-btn:hover { background: rgba(255, 82, 82, 0.4); }
+
+        /* INFO BOX */
+        #info-box { 
+            background: rgba(0,0,0,0.3); 
+            padding: 20px; 
+            border-radius: 20px; 
+            text-align: center; 
+            min-height: 140px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            transition: all 0.3s ease;
+        }
+
+        .info-title { font-size: 1.5em; margin-bottom: 5px; color: var(--accent); }
+        .info-details { font-size: 0.9em; line-height: 1.6; }
+        .badge { 
+            display: inline-block; 
+            padding: 4px 12px; 
+            background: rgba(255,255,255,0.15); 
+            border-radius: 20px; 
+            font-size: 0.8em; 
+            margin-top: 10px;
+        }
+
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <header>
+            <h1>🇵🇭 Interactive PH</h1>
+            <p class="subtitle">Explore the Pearl of the Orient</p>
+        </header>
+        
+        <div id="map-container">
+            <svg viewBox="0 0 250 500" id="ph-map">
+                <g id="islands">
+                    <path class="island-path" d="M80,10 L140,20 L160,80 L180,100 L120,180 L80,140 L50,80 Z" />
+                    <path class="island-path" d="M120,200 L180,210 L170,260 L130,280 L100,240 Z" />
+                    <path class="island-path" d="M130,300 L200,310 L210,400 L150,450 L100,400 L110,320 Z" />
+                    <path class="island-path" d="M40,180 L60,190 L50,280 L20,260 Z" />
+                </g>
+
+                <g class="city-marker" id="marker-manila" transform="translate(110, 130)" onclick="selectCity('manila')">
+                    <circle r="5" />
+                    <text y="-10">Manila</text>
+                </g>
+
+                <g class="city-marker" id="marker-cebu" transform="translate(145, 240)" onclick="selectCity('cebu')">
+                    <circle r="5" />
+                    <text y="-10">Cebu</text>
+                </g>
+
+                <g class="city-marker" id="marker-davao" transform="translate(160, 380)" onclick="selectCity('davao')">
+                    <circle r="5" />
+                    <text y="-10">Davao</text>
+                </g>
+            </svg>
+        </div>
+
+        <div class="buttons">
+            <button id="btn-manila" onclick="selectCity('manila')">🏙️ Manila</button>
+            <button id="btn-cebu" onclick="selectCity('cebu')">🏝️ Cebu</button>
+            <button id="btn-davao" onclick="selectCity('davao')">🌴 Davao</button>
+            <button class="reset-btn" onclick="resetMap()">🔄 Reset View</button>
+        </div>
+
+        <div id="info-box">
+            <h3 style="opacity: 0.7;">Select a city to begin</h3>
+        </div>
+    </div>
+
+    <script>
+        // Data Object
+        const cityData = {
+            manila: { 
+                name: 'Metro Manila', 
+                region: 'Luzon',
+                pop: '13.4 Million', 
+                desc: 'The capital city and economic heart of the country.',
+                landmark: 'Rizal Park',
+                zoom: 'scale(1.8) translate(10px, 100px)' // Custom zoom logic
+            },
+            cebu: { 
+                name: 'Cebu City', 
+                region: 'Visayas',
+                pop: '1 Million', 
+                desc: 'The Queen City of the South, known for lechon and history.',
+                landmark: 'Magellan\'s Cross',
+                zoom: 'scale(1.8) translate(-20px, -20px)'
+            },
+            davao: { 
+                name: 'Davao City', 
+                region: 'Mindanao',
+                pop: '1.8 Million', 
+                desc: 'The Durian capital and largest city by land area.',
+                landmark: 'Mount Apo',
+                zoom: 'scale(1.8) translate(-30px, -150px)'
+            }
+        };
+
+        let activeCity = null;
+
+        function selectCity(cityKey) {
+            const data = cityData[cityKey];
+            
+            // 1. Reset previous active states
+            document.querySelectorAll('.city-marker').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('button').forEach(el => el.classList.remove('active-btn'));
+
+            // 2. Set new active states
+            document.getElementById(`marker-${cityKey}`).classList.add('active');
+            document.getElementById(`btn-${cityKey}`).classList.add('active-btn');
+
+            // 3. Zoom effect on Map
+            const mapSvg = document.getElementById('ph-map');
+            mapSvg.style.transform = data.zoom;
+
+            // 4. Update Info Box with fade effect
+            const infoBox = document.getElementById('info-box');
+            infoBox.style.opacity = '0';
+            
+            setTimeout(() => {
+                infoBox.innerHTML = `
+                    <div class="info-title">${data.name}</div>
+                    <div class="badge">${data.region}</div>
+                    <div class="info-details" style="margin-top: 15px;">
+                        <strong>Population:</strong> ${data.pop}<br>
+                        <strong>Landmark:</strong> ${data.landmark}<br>
+                        <i style="color: #bbb; display:block; margin-top:5px;">"${data.desc}"</i>
+                    </div>
+                `;
+                infoBox.style.opacity = '1';
+            }, 300);
+
+            activeCity = cityKey;
+        }
+
+        function resetMap() {
+            // Remove active classes
+            document.querySelectorAll('.city-marker').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('button').forEach(el => el.classList.remove('active-btn'));
+
+            // Reset Zoom
+            document.getElementById('ph-map').style.transform = 'scale(1) translate(0,0)';
+
+            // Reset Info Box
+            const infoBox = document.getElementById('info-box');
+            infoBox.style.opacity = '0';
+            setTimeout(() => {
+                infoBox.innerHTML = '<h3 style="opacity: 0.7;">Select a city to begin</h3>';
+                infoBox.style.opacity = '1';
+            }, 300);
+
+            activeCity = null;
+        }
+    </script>
+</body>
+</html>
